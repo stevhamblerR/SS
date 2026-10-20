@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Tu Universo</title>
+<style>
+body{
+margin:0;
+overflow:hidden;
+background:black;
+font-family:Arial;
+}
+#inicio{
+position:absolute;
+width:100%;
+height:100vh;
+display:flex;
+flex-direction:column;
+justify-content:center;
+align-items:center;
+background-image:url("gato.jpg");
+background-size:cover;
+background-position:center;
+background-repeat:no-repeat;
+color:white;
+z-index:10;
+}
+#inicio::before{
+content:"";
+position:absolute;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.55);
+z-index:-1;
+
+/* FOTO DE PORTADA */
+
+background-image:url("kiss.png");
+background-size:cover;
+background-position:center;
+background-repeat:no-repeat;
+
+}
+#inicio h1{
+font-size:50px;
+margin-bottom:20px;
+}
+button{
+padding:15px 40px;
+font-size:22px;
+border:none;
+border-radius:30px;
+background:#ff4d6d;
+color:white;
+cursor:pointer;
+}
+#botonFugaz{
+position:absolute;
+top:20px;
+right:20px;
+padding:8px 15px;
+font-size:14px;
+border:none;
+border-radius:15px;
+background:#00ffcc;
+color:black;
+cursor:pointer;
+z-index:20;
+display:none;
+}
+canvas{display:block;}
+.label{
+color:white;
+font-size:14px;
+font-family:Arial;
+text-shadow:0 0 10px #fff,0 0 20px #ff00ff,0 0 30px #ff00ff,0 0 40px #ff00ff;
+}
+</style>
+</head>
+<body>
+<div id="inicio">
+<h1>Toca aquí mi Nikole</h1>
+<button onclick="iniciar()">Entrar</button>
+</div>
+
+<button id="botonFugaz" onclick="crearEstrellasFugaces()">¡Estrellas Fugaces!</button>
+
+<audio id="musica" loop>
+<source src="amor.mp4" type="audio/mpeg">
+</audio>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.134/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+let scene,camera,renderer,controls;
+let planetas=[],asteroides=[],fugaces=[],sol,agujeroNegro,galaxia,nave,agujeroDelTiempo;
+
+function iniciar(){
+document.getElementById("inicio").style.display="none";
+document.getElementById("musica").play();
+document.getElementById("botonFugaz").style.display="block";
+
+scene=new THREE.Scene();
+camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,3000);
+renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth,window.innerHeight);
+document.body.appendChild(renderer.domElement);
+controls=new THREE.OrbitControls(camera,renderer.domElement);
+camera.position.z=120;
+
+const luz=new THREE.PointLight(0xffffff,3,500);
+scene.add(luz);
+
+/* SOL */
+const geoSol=new THREE.SphereGeometry(5,32,32);
+const matSol=new THREE.MeshBasicMaterial({color:0xffff00});
+sol=new THREE.Mesh(geoSol,matSol);
+scene.add(sol);
+luz.position.copy(sol.position);
+
+/* PLANETAS ORIGINALES */
+crearPlaneta(8,0.5,0xaaaaaa,0.02);
+crearPlaneta(11,0.8,0xffcc99,0.015);
+crearPlaneta(15,1,0x3399ff,0.01);
+crearPlaneta(19,0.7,0xff3300,0.008);
+crearPlaneta(25,2.5,0xffcc66,0.005);
+crearSaturno(32,2,0xffddaa,0.004);
+crearPlaneta(38,1.6,0x66ccff,0.003);
+crearPlaneta(44,1.6,0x3366ff,0.002);
+
+/* PLANETAS GIGANTES CON TEXTO */
+let textos=["Te amo","Eres mi galaxia","Tú siempre tú"];
+for(let i=0;i<10;i++){
+let size=10 + Math.random()*15;
+let texto=textos[Math.floor(Math.random()*textos.length)];
+crearPlaneta(100 + Math.random()*800,size,Math.random()*0xffffff,0.001+Math.random()*0.001,texto);
+}
+
+/* GALAXIA ESPIRAL CON BRILLO */
+crearGalaxia();
+
+/* AGUJERO DEL TIEMPO */
+agujeroDelTiempo = crearAgujeroDelTiempo();
+
+/* ASTEROIDES GRANDES */
+crearAsteroides();
+
+/* AGUJERO NEGRO */
+crearAgujeroNegro();
+
+/* NAVE ESPACIAL */
+crearNave();
+
+animar();
+}
+
+/* FUNCIONES */
+function crearPlaneta(distancia,tamaño,color,velocidad,texto){
+const geo=new THREE.SphereGeometry(tamaño,32,32);
+const mat=new THREE.MeshStandardMaterial({color:color});
+const planeta=new THREE.Mesh(geo,mat);
+scene.add(planeta);
+planetas.push({mesh:planeta,dist:distancia,angle:Math.random()*Math.PI*2,speed:velocidad,texto:texto,tamaño:tamaño});
+if(texto && tamaño>10){
+const div=document.createElement('div');
+div.className='label';
+div.innerHTML=texto;
+document.body.appendChild(div);
+planeta.userData.label=div;
+planeta.userData.vel=[Math.random()*0.2-0.1,Math.random()*0.2-0.1,Math.random()*0.2-0.1];
+}
+}
+
+function crearSaturno(distancia,tamaño,color,velocidad){
+const geo=new THREE.SphereGeometry(tamaño,32,32);
+const mat=new THREE.MeshStandardMaterial({color:color});
+const planeta=new THREE.Mesh(geo,mat);
+const ringGeo=new THREE.RingGeometry(tamaño*1.5,tamaño*2.2,64);
+const ringMat=new THREE.MeshBasicMaterial({color:0xffffff,side:THREE.DoubleSide,transparent:true,opacity:0.7});
+const anillo=new THREE.Mesh(ringGeo,ringMat);
+anillo.rotation.x=Math.PI/2;
+planeta.add(anillo);
+scene.add(planeta);
+planetas.push({mesh:planeta,dist:distancia,angle:Math.random()*Math.PI*2,speed:velocidad});
+}
+
+function crearGalaxia(){
+const estrellas=12000, brazos=4;
+const geo=new THREE.BufferGeometry();
+const posiciones=[];
+for(let i=0;i<estrellas;i++){
+const radio=Math.random()*500;
+const brazo=i%brazos;
+const angulo=radio*0.05 + (brazo*Math.PI*2/brazos);
+const x=Math.cos(angulo)*radio;
+const y=(Math.random()-0.5)*30;
+const z=Math.sin(angulo)*radio;
+posiciones.push(x,y,z);
+}
+geo.setAttribute("position",new THREE.Float32BufferAttribute(posiciones,3));
+const mat=new THREE.PointsMaterial({color:0xffffff,size:0.7,transparent:true,opacity:0.9});
+galaxia=new THREE.Points(geo,mat);
+scene.add(galaxia);
+}
+
+/* AGUJERO DEL TIEMPO */
+function crearAgujeroDelTiempo() {
+    const geo = new THREE.SphereGeometry(8, 32, 32);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
+    const agujeroTiempo = new THREE.Mesh(geo, mat);
+    agujeroTiempo.position.set(500, 0, 500);
+    scene.add(agujeroTiempo);
+
+    const div = document.createElement('div');
+    div.className = 'label';
+    div.innerHTML = 
+    div.style.fontSize = '16px';
+    div.style.color = 'red';
+    document.body.appendChild(div);
+    agujeroTiempo.userData.label = div;
+
+    // Mensaje interactivo al hacer click
+    const mensaje = document.createElement('div');
+    mensaje.className = 'label';
+    mensaje.innerHTML = "Este es un agujero del tiempo, pero no podrás viajar al pasado para enmendar tu error, porque eso lo tienes que hacer en el presente.";
+    mensaje.style.fontSize = '18px';
+    mensaje.style.color = 'red';
+    mensaje.style.fontWeight = 'bold';
+    mensaje.style.textAlign = 'center';
+    mensaje.style.width = '400px';
+    mensaje.style.position = 'absolute';
+    mensaje.style.display = 'none';
+    document.body.appendChild(mensaje);
+    agujeroTiempo.userData.mensaje = mensaje;
+
+    // Evento click sobre el agujero
+    agujeroTiempo.callback = () => {
+        mensaje.style.display = 'block';
+        mensaje.style.opacity = 1;
+
+        // Duración fija de 4 segundos
+        setTimeout(()=>{
+            mensaje.style.display = 'none';
+        }, 9000);
+    }
+
+    return agujeroTiempo;
+}
+
+function crearAsteroides(){
+for(let i=0;i<300;i++){
+const geo=new THREE.DodecahedronGeometry(3+Math.random()*5,0);
+const mat=new THREE.MeshStandardMaterial({color:0x888888,roughness:1,metalness:0});
+const roca=new THREE.Mesh(geo,mat);
+roca.position.set((Math.random()-0.5)*2000,(Math.random()-0.5)*800,(Math.random()-0.5)*2000);
+scene.add(roca);
+asteroides.push({mesh:roca});
+}
+}
+
+function crearAgujeroNegro(){
+const geo=new THREE.SphereGeometry(6,32,32);
+const mat=new THREE.MeshBasicMaterial({color:0x000000});
+agujeroNegro=new THREE.Mesh(geo,mat);
+agujeroNegro.position.set(200,0,0);
+scene.add(agujeroNegro);
+}
+
+function crearEstrellasFugaces(){
+for(let i=0;i<5;i++){
+const geo=new THREE.SphereGeometry(0.5,8,8);
+const color=new THREE.Color(Math.random(),Math.random(),Math.random());
+const mat=new THREE.MeshBasicMaterial({color:color});
+const estrella=new THREE.Mesh(geo,mat);
+
+estrella.position.set(-500, Math.random()*50-25, Math.random()*50-25);
+scene.add(estrella);
+
+const velX = 1000 / 5;
+const velY = 0;
+const velZ = 0;
+
+const trailGeo=new THREE.BufferGeometry();
+const trailVertices=[];
+for(let j=0;j<50;j++){
+trailVertices.push(estrella.position.x-j*velX/50, estrella.position.y, estrella.position.z);
+}
+trailGeo.setAttribute("position",new THREE.Float32BufferAttribute(trailVertices,3));
+const trailMat=new THREE.LineBasicMaterial({color:color, transparent:true, opacity:0.9});
+const trail=new THREE.Line(trailGeo,trailMat);
+scene.add(trail);
+
+fugaces.push({mesh:estrella,trail:trail,vel:[velX,velY,velZ],tiempo:0});
+}
+}
+
+function crearNave(){
+const geo=new THREE.ConeGeometry(2,6,16);
+const mat=new THREE.MeshStandardMaterial({color:0xff0000});
+nave=new THREE.Mesh(geo,mat);
+nave.position.set(-300,50,0);
+scene.add(nave);
+nave.userData.vel=[0.5,0,0.3];
+}
+
+function animar(){
+requestAnimationFrame(animar);
+
+planetas.forEach(p=>{
+if(p.dist){
+p.angle+=p.speed;
+p.mesh.position.x=Math.cos(p.angle)*p.dist;
+p.mesh.position.z=Math.sin(p.angle)*p.dist;
+}
+if(p.tamaño>10){
+p.mesh.position.x += p.mesh.userData.vel[0];
+p.mesh.position.y += p.mesh.userData.vel[1];
+p.mesh.position.z += p.mesh.userData.vel[2];
+}
+if(p.texto && p.tamaño>10 && p.mesh.userData.label){
+const vector=p.mesh.position.clone();
+vector.project(camera);
+const x=(vector.x*0.5+0.5)*window.innerWidth;
+const y=(-vector.y*0.5+0.5)*window.innerHeight;
+p.mesh.userData.label.style.left=(x-30)+"px";
+p.mesh.userData.label.style.top=(y-10)+"px";
+}
+})
+
+asteroides.forEach((a)=>{
+a.mesh.position.x += (Math.random()-0.5) * 0.5;
+a.mesh.position.y += (Math.random()-0.5) * 0.2;
+a.mesh.position.z += (Math.random()-0.5) * 0.5;
+})
+
+fugaces.forEach((f,index)=>{
+f.mesh.position.x += f.vel[0]*0.016;
+f.mesh.position.y += f.vel[1]*0.016;
+f.mesh.position.z += f.vel[2]*0.016;
+
+let positions=f.trail.geometry.attributes.position.array;
+for(let i=positions.length-3;i>=3;i-=3){
+positions[i]=positions[i-3];
+positions[i+1]=positions[i-2];
+positions[i+2]=positions[i-1];
+}
+positions[0]=f.mesh.position.x;
+positions[1]=f.mesh.position.y;
+positions[2]=f.mesh.position.z;
+f.trail.geometry.attributes.position.needsUpdate=true;
+
+f.tiempo += 0.016;
+if(f.tiempo>5){
+scene.remove(f.mesh);
+scene.remove(f.trail);
+fugaces.splice(index,1);
+}
+})
+
+if(nave){
+nave.position.x+=nave.userData.vel[0];
+nave.position.y+=nave.userData.vel[1];
+nave.position.z+=nave.userData.vel[2];
+}
+
+if(galaxia) galaxia.rotation.y+=0.0003;
+
+/* Texto del agujero del tiempo */
+if(agujeroDelTiempo && agujeroDelTiempo.userData.label){
+const vector = agujeroDelTiempo.position.clone();
+vector.project(camera);
+const x = (vector.x*0.5 + 0.5) * window.innerWidth;
+const y = (-vector.y*0.5 + 0.5) * window.innerHeight - 50;
+agujeroDelTiempo.userData.label.style.left = (x - 120) + "px";
+agujeroDelTiempo.userData.label.style.top = (y - 20) + "px";
+}
+
+if(agujeroDelTiempo && agujeroDelTiempo.userData.mensaje){
+const vector = agujeroDelTiempo.position.clone();
+vector.project(camera);
+const x = (vector.x*0.5 + 0.5) * window.innerWidth;
+const y = (-vector.y*0.5 + 0.5) * window.innerHeight - 50;
+agujeroDelTiempo.userData.mensaje.style.left = (x - 200) + "px";
+agujeroDelTiempo.userData.mensaje.style.top = (y - 10) + "px";
+}
+
+controls.update();
+renderer.render(scene,camera);
+}
+
+/* Raycaster para clic en el agujero del tiempo */
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+window.addEventListener('click', (event)=>{
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(agujeroDelTiempo);
+    if(intersects.length > 0){
+        if(agujeroDelTiempo.callback) agujeroDelTiempo.callback();
+    }
+});
+</script>
+</body>
+</html>
